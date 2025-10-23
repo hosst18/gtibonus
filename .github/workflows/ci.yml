@@ -1,33 +1,33 @@
+# .github/workflows/ci.yml
 name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ['**']        # déclenche sur toutes les branches
   pull_request:
-    branches: [ "main" ]
 
 jobs:
   ci:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: npm
+          node-version: '20'
+          cache: 'npm'
 
       - name: Install
-        run: npm ci --cache .npm --prefer-offline
+        run: npm ci
 
-      - name: Lint
-        run: npm run lint
-        if: ${{ hashFiles('**/*') != '' && exists('package.json') && contains(steps.pkg.outputs.scripts, 'lint') }}
-        shell: bash
+      - name: Lint (optional)
+        run: npm run lint --if-present
 
-      - name: Test
+      - name: Test (optional)
         run: npm test --if-present
 
-      - name: Build
+      - name: Build (optional)
         run: npm run build --if-present
