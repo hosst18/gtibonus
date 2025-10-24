@@ -1,33 +1,30 @@
-# .github/workflows/ci.yml
 name: CI
 
 on:
   push:
-    branches: ['**']        # déclenche sur toutes les branches
+    branches: ["main"]
   pull_request:
+    branches: ["main"]
+  workflow_dispatch:
 
 jobs:
-  ci:
+  build:
     runs-on: ubuntu-latest
-
+    container: node:latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Use Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install
-        run: npm ci
+      - uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            .npm
+          key: npm-${{ hashFiles('package-lock.json') }}
 
-      - name: Lint (optional)
-        run: npm run lint --if-present
-
-      - name: Test (optional)
-        run: npm test --if-present
-
-      - name: Build (optional)
-        run: npm run build --if-present
+      - name: Install dependencies
+        run: npm ci --cache .npm --prefer-offline
