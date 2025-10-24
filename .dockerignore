@@ -1,4 +1,3 @@
-
 node_modules
 npm-debug.log
 yarn-error.log
@@ -14,17 +13,11 @@ coverage/
 *.test.js
 *.spec.js
 
-
 .env
-.env.local
-.env.development
-.env.test
-.env.production
-
+.env.*
 
 .DS_Store
 Thumbs.db
-
 
 Dockerfile
 .dockerignore
