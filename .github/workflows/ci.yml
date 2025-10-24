@@ -11,7 +11,7 @@ on:
 permissions:
   contents: write
 
-# optional: expose repo var to steps (not used in job if)
+# (optionnel) expose la variable de dépôt si tu veux l'utiliser dans des steps
 env:
   ENV_TARGET: ${{ vars.ENV_TARGET || '' }}
 
@@ -61,7 +61,6 @@ jobs:
     name: Only Canary
     runs-on: ubuntu-latest
     needs: lint
-    # use vars.* at job-level conditions
     if: "${{ vars.ENV_TARGET == 'canary' }}"
     steps:
       - name: Hello Only Canary
@@ -91,10 +90,19 @@ jobs:
           CI: true
         run: npm test
 
+  integration_test:
+    name: Integration Test
+    runs-on: ubuntu-latest
+    needs: unit_test
+    if: "${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore: release') }}"
+    steps:
+      - name: Hello Integration
+        run: echo "Hello Integration !"
+
   e2e_test:
     name: E2E Test (PRs only)
     runs-on: ubuntu-latest
-    needs: unit_test
+    needs: integration_test
     if: "${{ github.event_name == 'pull_request' }}"
     steps:
       - name: Hello E2E
