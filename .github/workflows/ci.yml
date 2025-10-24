@@ -77,6 +77,15 @@ jobs:
           CI: true
         run: npm test
 
+  e2e_test:
+    name: E2E Test (PRs only)
+    runs-on: ubuntu-latest
+    needs: unit_test
+    if: "${{ github.event_name == 'pull_request' }}"
+    steps:
+      - name: Hello E2E
+        run: echo "Hello E2E !"
+
   release:
     name: Release
     runs-on: ubuntu-latest
