@@ -103,5 +103,5 @@ jobs:
         run: npm ci --cache .npm --prefer-offline
       - name: Release with release-it
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         run: npx --yes release-it --ci
