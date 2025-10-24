@@ -8,6 +8,12 @@ on:
     branches: ["main"]
   workflow_dispatch:
 
+# Évite les exécutions concurrentes sur la même ref
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Permissions par défaut (release-it a besoin d'écrire les tags, GHCR a besoin d'écrire les packages)
 permissions:
   contents: write
   packages: write
@@ -19,19 +25,23 @@ jobs:
   install:
     name: Install
     runs-on: ubuntu-latest
-    container: node:latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      # Cache supplémentaire (utile si beaucoup de deps)
       - uses: actions/cache@v4
         with:
           path: |
             node_modules
             .npm
           key: npm-${{ hashFiles('package-lock.json') }}
+
       - name: Install dependencies
         run: npm ci --cache .npm --prefer-offline
 
@@ -42,18 +52,23 @@ jobs:
     if: "${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore: release') }}"
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: package-lock.json
+
       - uses: actions/cache@v4
         with:
           path: |
             node_modules
             .npm
           key: npm-${{ hashFiles('package-lock.json') }}
+
       - name: Install deps
         run: npm ci --cache .npm --prefer-offline
+
       - name: Run ESLint
         run: npm run lint
 
@@ -73,18 +88,23 @@ jobs:
     if: "${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore: release') }}"
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: package-lock.json
+
       - uses: actions/cache@v4
         with:
           path: |
             node_modules
             .npm
           key: npm-${{ hashFiles('package-lock.json') }}
+
       - name: Install deps
         run: npm ci --cache .npm --prefer-offline
+
       - name: Run unit tests (Vitest)
         env:
           CI: true
@@ -109,12 +129,15 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+
       - uses: docker/setup-buildx-action@v3
+
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
       - id: meta
         uses: docker/metadata-action@v5
         with:
@@ -123,6 +146,7 @@ jobs:
             type=ref,event=branch
             type=sha
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -130,6 +154,23 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      # ⬇️ Optionnel : rendre le package GHCR public automatiquement (nécessite un PAT dans GH_TOKEN)
+      - name: Make GHCR package public (idempotent)
+        if: ${{ github.ref == 'refs/heads/main' && secrets.GH_TOKEN != '' }}
+        env:
+          OWNER: ${{ github.repository_owner }}
+          REPO:  ${{ github.event.repository.name }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          set -e
+          PKG_NAME="$(echo "$REPO" | tr '[:upper:]' '[:lower:]')"
+          echo "Setting visibility to public for container package: ${PKG_NAME}"
+          curl -sSf -X PATCH \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/user/packages/container/${PKG_NAME}/visibility \
+            -d '{"visibility":"public"}' || echo "Already public or first push not indexed yet"
 
   e2e_test:
     name: E2E Test (PRs only)
@@ -145,27 +186,37 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_docker]
     if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && !startsWith(github.event.head_commit.message, 'chore: release')) }}"
+    permissions:
+      contents: write
+      packages: write
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: package-lock.json
+
       - uses: actions/cache@v4
         with:
           path: |
             node_modules
             .npm
           key: npm-${{ hashFiles('package-lock.json') }}
+
       - name: Configure Git identity
         run: |
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
+
       - name: Install deps
         run: npm ci --cache .npm --prefer-offline
+
       - name: Release with release-it
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          # Utilise le token intégré (évite d'avoir un PAT)
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx --yes release-it --ci
