@@ -11,7 +11,6 @@ on:
 permissions:
   contents: write
 
-# (optionnel) expose la variable de dépôt si tu veux l'utiliser dans des steps
 env:
   ENV_TARGET: ${{ vars.ENV_TARGET || '' }}
 
@@ -52,7 +51,7 @@ jobs:
             node_modules
             .npm
           key: npm-${{ hashFiles('package-lock.json') }}
-      - name: Install deps (restore from cache if possible)
+      - name: Install deps
         run: npm ci --cache .npm --prefer-offline
       - name: Run ESLint
         run: npm run lint
@@ -83,7 +82,7 @@ jobs:
             node_modules
             .npm
           key: npm-${{ hashFiles('package-lock.json') }}
-      - name: Install deps (restore from cache if possible)
+      - name: Install deps
         run: npm ci --cache .npm --prefer-offline
       - name: Run unit tests (Vitest)
         env:
